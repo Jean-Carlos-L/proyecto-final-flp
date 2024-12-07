@@ -30,7 +30,7 @@
       (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
 
       ;; Condicionales
-      (expresion ("if" expresion "then" expresion "else" expresion) if-expresion)
+      (expresion ("if" boolenas-expresion "then" expresion (arbno "elseif" boolenas-expresion "then" expresion) "else" expresion "end") if-expresion)
 
       ;; Primitivas Aritmeticas
       (expresion (primitiva "(" (separated-list expresion ",") ")") primitiva-expresion)
@@ -140,3 +140,11 @@
       )
    )
 )
+
+
+;; Siguientes pasos
+
+;; 1. Definir evaluar primitiva
+;; 2. Definir opracion primitiva
+;; 3. Definir evaluar expresion
+;; 4. Probar el interprete
