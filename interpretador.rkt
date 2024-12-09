@@ -15,10 +15,10 @@
 
 (define especificacion-gramatical
    '(
-      (programa ((arbno declaracion-clase) expresion) a-program)
+      (programa (expresion) a-program)
       (expresion (numero) literal-expresion)
       (expresion (identificador) variable-expresion)
-      (expresion ("'" letter "'") caracter-expresion)
+      (expresion ("'" letter "'") caracter-expresion) ;; pendiente
       (expresion ("\"" (letter (arbno (or letter digit))) "\"") cadena-expresion)
       (expresion ("ok") ok-expresion)
 
@@ -31,6 +31,16 @@
 
       ;; Condicionales
       (expresion ("if" boolenas-expresion "then" expresion (arbno "elseif" boolenas-expresion "then" expresion) "else" expresion "end") if-expresion)
+
+      (expresion ("proc" "(" (separated-list identificador ",") ")" expresion "end") proc-expresion)
+      (expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
+      (expresion ("meth" "(" identificador "," (separated-list identificador ",") ")" expresion "end") meth-expresion)
+      (expresion ("for" identificador "=" expresion "to" expresion "do" expresion "end") for-expresion)
+      (expresion ("object" "{" (arbno identificador "=>" expresion) "}") object-expresion)
+      (expresion ("get" identificador "." identificador) get-expresion)
+      (expresion ("send" identificador "." identificador "(" (separated-list identificador ",") ")") send-expresion)
+      (expresion ("update" identificador "." identificador ":=" expresion) update-expresion)
+      (expresion ("clone" "(" identificador (separated-list identificador ",") ")") clone-expresion)
 
       ;; Primitivas Aritmeticas
       (expresion (primitiva "(" (separated-list expresion ",") ")") primitiva-expresion)
@@ -145,6 +155,27 @@
 ;; Siguientes pasos
 
 ;; 1. Definir evaluar primitiva
+(define evaluar-primitiva
+  (lambda (prim lval)
+    (cases primitiva prim
+      (sum-prim () (operacion-prim lval + 0))
+      (minus-prim () (operacion-prim lval - 0))
+      (mult-prim () (operacion-prim lval * 1))
+      (mod-prim () (% (car lval) (cadr lval))) 
+
+      (menor-prim () (< (car lval) (cadr lval)))
+      (menorigual-prim () (<= (car lval) (cadr lval)))
+      (mayor-prim () (> (car lval) (cadr lval)))
+      (mayorigual-prim () (>= (car lval) (cadr lval)))
+      
+      (and-prim () (and (car lval) (cadr lval)))
+      (or-prim () (or (car lval) (cadr lval)))
+      (not-prim () (not (car lval)))
+      ;; primitivas is, &
+      
+      )
+    )
+  )
 ;; 2. Definir opracion primitiva
 ;; 3. Definir evaluar expresion
 ;; 4. Probar el interprete
