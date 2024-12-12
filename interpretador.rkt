@@ -3,9 +3,10 @@
 (define especificacion-lexica
    '(
       (espacio-blanco (whitespace) skip)
-      (comentario-linea ("*" (arbno (not #\newline) "*")) skip)
-      (comentario-bloque ("(*" (arbno (not "*)") "*)") skip))
-      (identificador (letter (arbno (or letter digit "?" "$"))) symbol)
+      (comentario-linea ("%" (arbno (not #\newline))) skip)
+      (identificador ("$" letter (arbno (or letter digit "?" "$"))) symbol)
+      (caracter ("'" letter "'") symbol)
+      (cadena ("\"" (arbno (or digit letter)) "\"") string)
       (numero (digit (arbno digit)) number)
       (numero ("-" digit (arbno digit)) number)
       (numero (digit (arbno digit) "." digit (arbno digit)) number)
@@ -18,8 +19,8 @@
       (programa (expresion) a-program)
       (expresion (numero) literal-expresion)
       (expresion (identificador) variable-expresion)
-      (expresion ("'" letter "'") caracter-expresion) ;; pendiente
-      (expresion ("\"" (letter (arbno (or letter digit))) "\"") cadena-expresion)
+      (expresion (caracter) caracter-expresion) ;; pendiente
+      (expresion (cadena) cadena-expresion)
       (expresion ("ok") ok-expresion)
 
       ;; Ligaduras
@@ -32,15 +33,15 @@
       ;; Condicionales
       (expresion ("if" boolenas-expresion "then" expresion (arbno "elseif" boolenas-expresion "then" expresion) "else" expresion "end") if-expresion)
 
-      (expresion ("proc" "(" (separated-list identificador ",") ")" expresion "end") proc-expresion)
-      (expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
-      (expresion ("meth" "(" identificador "," (separated-list identificador ",") ")" expresion "end") meth-expresion)
-      (expresion ("for" identificador "=" expresion "to" expresion "do" expresion "end") for-expresion)
-      (expresion ("object" "{" (arbno identificador "=>" expresion) "}") object-expresion)
-      (expresion ("get" identificador "." identificador) get-expresion)
-      (expresion ("send" identificador "." identificador "(" (separated-list identificador ",") ")") send-expresion)
-      (expresion ("update" identificador "." identificador ":=" expresion) update-expresion)
-      (expresion ("clone" "(" identificador (separated-list identificador ",") ")") clone-expresion)
+      ;;(expresion ("proc" "(" (separated-list identificador ",") ")" expresion "end") proc-expresion)
+      ;;(expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
+      ;;(expresion ("meth" "(" identificador "," (separated-list identificador ",") ")" expresion "end") meth-expresion)
+      ;;(expresion ("for" identificador "=" expresion "to" expresion "do" expresion "end") for-expresion)
+      ;;(expresion ("object" "{" (arbno identificador "=>" expresion) "}") object-expresion)
+      ;;(expresion ("get" identificador "." identificador) get-expresion)
+      ;;(expresion ("send" identificador "." identificador "(" (separated-list identificador ",") ")") send-expresion)
+      ;;(expresion ("update" identificador "." identificador ":=" expresion) update-expresion)
+      ;;(expresion ("clone" "(" identificador (separated-list identificador ",") ")") clone-expresion)
 
       ;; Primitivas Aritmeticas
       (expresion (primitiva "(" (separated-list expresion ",") ")") primitiva-expresion)
@@ -48,15 +49,15 @@
       (primitiva ("-") resta-primitiva)
       (primitiva ("*") multiplicacion-primitiva)
       (primitiva ("%") modulo-primitiva)
-      (primitiva ("&") concatenacion-primitiva)
+      ;;(primitiva ("&") concatenacion-primitiva)
 
       ;; Primitivas Booleanas
       (expresion (primitiva-booleana "(" (separated-list expresion ",") ")") primitiva-booleana-expresion)
-      (primitiva-booleana ("is" expresion expresion) igual-expresion)
-      (primitiva-booleana ("<" expresion expresion) menor-expresion)
-      (primitiva-booleana (">" expresion expresion) mayor-expresion)
-      (primitiva-booleana ("<=" expresion expresion) menor-igual-expresion)
-      (primitiva-booleana (">=" expresion expresion) mayor-igual-expresion)
+      ;;(primitiva-booleana ("is" expresion expresion) igual-expresion)
+      (primitiva-booleana ("<") menor-expresion)
+      (primitiva-booleana (">") mayor-expresion)
+      (primitiva-booleana ("<=") menor-igual-expresion)
+      (primitiva-booleana (">=") mayor-igual-expresion)
 
       ;; Operaciones booleanas
       (expresion (operaciones-booleanas "(" (separated-list expresion ",") ")") operaciones-booleanas-expresion)
@@ -65,42 +66,50 @@
       (operaciones-booleanas ("or") or-booleana)
 
       ;; Expresion booleanas
-      (expresion (boolenas-expresion "(" (separated-list expresion ",") ")") boolenas-expresion)
+      (expresion (boolenas-expresion "(" (separated-list expresion ",") ")") boolenas-expresion-expresion)
       (boolenas-expresion ("true") true-booleana)
       (boolenas-expresion ("false") false-booleana)
-      (boolenas-expresion primitiva-booleana "(" (separated-list expresion ",") ")" list-primitivas-booleana)
-      (boolenas-expresion operaciones-booleanas "(" (separated-list boolenas-expresion ",") ")" list-operaciones-booleana)
+      ;;(boolenas-expresion primitiva-booleana "(" (separated-list expresion ",") ")" list-primitivas-booleana)
+      ;;(boolenas-expresion operaciones-booleanas "(" (separated-list boolenas-expresion ",") ")" list-operaciones-booleana)
    )
 )
 
 ;; Creamos los datatypes automaticamente
 (sllgen:make-define-datatypes especificacion-lexica especificacion-gramatical)
 
+(define-datatype procedimiento procedimiento?
+   (closure 
+      (variable (list-of symbol?))
+      (cuerpo expresion?)
+      (ambiente ambiente?)
+   )
+)
+
 ;; Definimos los ambientes
 (define-datatype ambiente ambiente?
    (ambiente-vacio)
-   (ambiente-exntedio-referencia 
+   (ambiente-extendido-referencia 
       (lista-ids (list-of symbol?))
       (lista-valores vector?)
       (old-env ambiente?)
    )
 )
 
-(define-datatype ambiente-extendido
+(define ambiente-extendido
    (lambda (lista-ids lista-valores old-env)
       (ambiente-extendido-referencia 
          lista-ids 
-         (lista->vector lista-valores) 
+         (list->vector lista-valores) 
          old-env
       )
    )
 )
 
-(define-datatype ambiente-extendido-recursivo
+(define ambiente-extendido-recursivo
    (lambda (nombres-procedimientos lista-ids cuerpos old-env)
       (let
          ((vectores-clausuras (make-vector (length nombres-procedimientos))))
-         (letrect
+         (letrec
             (
                (ambiente (ambiente-extendido-referencia nombres-procedimientos vectores-clausuras old-env))
                (obtener-clausuras 
@@ -120,6 +129,42 @@
             (obtener-clausuras lista-ids cuerpos 0)
          )
       )
+   )
+)
+
+(define-datatype referencia referencia?
+   (a-ref 
+      (i number?) 
+      (v vector?)
+   )
+)
+
+(define primitiva-deref
+   (lambda (ref)
+      (cases
+         referencia ref
+         (a-ref (i v) (vector-ref v i))
+      )
+   )
+)
+
+(define deref
+   (lambda (ref)
+      (primitiva-deref ref)
+   )
+)
+
+(define primitva-setref!
+   (lambda (ref valor)
+      (cases referencia ref
+         (a-ref (i v) (vector-set! v i valor))
+      )
+   )
+)
+
+(define setref!
+   (lambda (ref valor)
+      (primitva-setref! ref valor)
    )
 )
 
@@ -151,31 +196,185 @@
    )
 )
 
+(define operacion-primitiva
+   (lambda (lval operacion identidad)
+      (cond
+         [(null? lval) identidad]
+         [else (operacion (car lval) (operacion-primitiva (cdr lval) operacion identidad))]
+      )
+   )
+)
 
-;; Siguientes pasos
-
-;; 1. Definir evaluar primitiva
 (define evaluar-primitiva
-  (lambda (prim lval)
-    (cases primitiva prim
-      (sum-prim () (operacion-prim lval + 0))
-      (minus-prim () (operacion-prim lval - 0))
-      (mult-prim () (operacion-prim lval * 1))
-      (mod-prim () (% (car lval) (cadr lval))) 
-
-      (menor-prim () (< (car lval) (cadr lval)))
-      (menorigual-prim () (<= (car lval) (cadr lval)))
-      (mayor-prim () (> (car lval) (cadr lval)))
-      (mayorigual-prim () (>= (car lval) (cadr lval)))
-      
-      (and-prim () (and (car lval) (cadr lval)))
-      (or-prim () (or (car lval) (cadr lval)))
-      (not-prim () (not (car lval)))
-      ;; primitivas is, &
+   (lambda (prim lval)
+      (cases primitiva prim
+         (suma-primitiva () (operacion-primitiva lval + 0))
+         (resta-primitiva () (operacion-primitiva lval - 0))
+         (multiplicacion-primitiva () (operacion-primitiva lval * 1))
+         (modulo-primitiva () (remainder (car lval) (cadr lval))) 
+         ;; primitivas is, &
       
       )
-    )
-  )
-;; 2. Definir opracion primitiva
-;; 3. Definir evaluar expresion
-;; 4. Probar el interprete
+   )
+)
+
+(define evaluar-primitiva-boooleana
+   (lambda (prim lval)
+      (cases primitiva-booleana prim
+         (menor-expresion () (< (car lval) (cadr lval)))
+         (menor-igual-expresion () (<= (car lval) (cadr lval)))
+         (mayor-expresion () (> (car lval) (cadr lval)))
+         (mayor-igual-expresion () (>= (car lval) (cadr lval)))
+      )
+   )
+)
+
+(define evaluar-expresion
+   (lambda (exp ambi)
+      (cases expresion exp
+         (literal-expresion (dato) dato)
+         (variable-expresion (variable) (aplicar-ambiente ambi variable))
+         (caracter-expresion (caracter) caracter)
+         (cadena-expresion (cadena) cadena)
+         (ok-expresion () 'ok)
+         (boolenas-expresion-expresion (exp1 exp2)
+            (cases boolenas-expresion exp
+               (true-booleana () #t)
+               (false-booleana () #f)
+            )
+         )
+
+         (primitiva-expresion (primitiva lista-valores)
+            (let
+               ((lval (map (lambda (exp) (evaluar-expresion exp ambi)) lista-valores)))
+               (evaluar-primitiva primitiva lval)
+            )
+         )
+         (primitiva-booleana-expresion (primitiva-booleana lista-valores)
+            (let
+               ((lval (map (lambda (exp) (evaluar-expresion exp ambi)) lista-valores)))
+               (evaluar-primitiva-boooleana primitiva-booleana lval)
+            )
+         )
+         (operaciones-booleanas-expresion (lista-operaciones-booleanas lista-valores)
+            (let
+               ((lval (map (lambda (exp) (evaluar-expresion exp ambi)) lista-valores)))
+               (cases operaciones-booleanas lista-operaciones-booleanas
+                  (not-booleana () (not (car lval)))
+                  (and-booleana () (map (lambda (x) x) lval)) ;; TODO revisar
+                  (or-booleana () (map (lambda (x) x) lval)) ;; TODO revisar
+               )
+            )
+         )
+
+         (var-expresion (lista-ids lista-expresiones exp)
+            (let
+               (
+                  (valores (map (lambda (exp) (evaluar-expresion exp ambi)) lista-expresiones))
+               )
+               (evaluar-expresion exp (ambiente-extendido lista-ids valores ambi))
+            )
+         )
+         (let-expresion
+            (lista-ids lista-expresiones exp)
+            (let
+               (
+                  (valores (map (lambda (exp) (evaluar-expresion exp ambi)) lista-expresiones))
+               )
+               (evaluar-expresion exp (ambiente-extendido lista-ids valores ambi))
+            )
+         )
+         (letrec-expresion
+            (lista-ids lista-params cuerpos exp)
+            (evaluar-expresion 
+               exp
+               (ambiente-extendido-recursivo lista-ids lista-params cuerpos ambi))
+         )
+         (begin-expresion (exp lista-expresiones)
+            (if
+               (null? lista-expresiones)
+               (evaluar-expresion exp ambi)
+               (begin
+                  (evaluar-expresion exp ambi)
+                  (letrec 
+                     (
+                        (evaluar-begin (lambda (lista-expresiones)
+                           (cond
+                              [(null? (cdr lista-expresiones)) (evaluar-expresion (car lista-expresiones) ambi)]
+                              [else
+                                 (begin
+                                    (evaluar-expresion (car lista-expresiones) ambi)
+                                    (evaluar-begin (cdr lista-expresiones))
+                                 )
+                              ]
+                           )
+                        ))
+                     )
+                     (evaluar-begin lista-expresiones)
+                  )
+               )
+            )
+         )
+         (set-expresion (variable exp)
+            (begin
+               (setref!
+                  (aplicar-ambiente-referencia ambi variable)
+                  (evaluar-expresion exp ambi)
+               )
+            )
+         )
+         (if-expresion (condicion exp lista-condiciones lista-expresiones expresion-else)
+            (if
+               (evaluar-expresion condicion ambi)
+               (evaluar-expresion exp ambi)
+               (letrec
+                  (
+                     (evaluar-elseif
+                        (lambda (lista-condiciones lista-expresiones)
+                           (cond
+                              [(null? lista-condiciones) (evaluar-expresion expresion-else ambi)]
+                              [else
+                                 (if
+                                    (evaluar-expresion (car lista-condiciones) ambi)
+                                    (evaluar-expresion (car lista-expresiones) ambi)
+                                    (evaluar-elseif (cdr lista-condiciones) (cdr lista-expresiones))
+                                 )
+                              ]
+                           )
+                        )
+                     )
+                  )
+                  (evaluar-elseif lista-condiciones lista-expresiones)
+               )
+            )
+         )
+      )
+   )
+)
+
+(define ambiente-inicial
+   (ambiente-extendido '($var1 $var2 $var3) '(2 "Hola mundo" 'a) (ambiente-vacio))
+)
+
+(define evaluar-programa
+   (lambda (program)
+      (cases programa program
+         (a-program (exp)
+            (evaluar-expresion exp ambiente-inicial)
+         )
+      )
+   )
+)
+
+(define interpretador
+   (sllgen:make-rep-loop 
+      "interpretador> " 
+      evaluar-programa
+      (sllgen:make-stream-parser
+         especificacion-lexica 
+         especificacion-gramatical
+      )
+   )
+)
+
+(interpretador)   
