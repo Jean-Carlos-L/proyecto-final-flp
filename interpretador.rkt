@@ -1,12 +1,14 @@
 #lang eopl
 
+
+
 (define especificacion-lexica
    '(
       (espacio-blanco (whitespace) skip)
       (comentario-linea ("%" (arbno (not #\newline))) skip)
       (identificador ("$" letter (arbno (or letter digit "?" "$"))) symbol)
       (caracter ("'" letter "'") symbol)
-      (cadena ("\"" (arbno (or digit letter)) "\"") string)
+      (cadena ("\""(arbno (or digit letter whitespace)) "\"") string)
       (numero (digit (arbno digit)) number)
       (numero ("-" digit (arbno digit)) number)
       (numero (digit (arbno digit) "." digit (arbno digit)) number)
@@ -31,7 +33,7 @@
       (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
 
       ;; Condicionales
-      (expresion ("if" boolenas-expresion "then" expresion (arbno "elseif" boolenas-expresion "then" expresion) "else" expresion "end") if-expresion)
+      (expresion ("if" expresion "then" expresion (arbno "elseif" expresion "then" expresion) "else" expresion "end") if-expresion)
 
       ;;(expresion ("proc" "(" (separated-list identificador ",") ")" expresion "end") proc-expresion)
       ;;(expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
@@ -49,7 +51,8 @@
       (primitiva ("-") resta-primitiva)
       (primitiva ("*") multiplicacion-primitiva)
       (primitiva ("%") modulo-primitiva)
-      ;;(primitiva ("&") concatenacion-primitiva)
+      (primitiva ("&") concatenacion-primitiva)
+      (primitiva ("is") igual-expresion)
 
       ;; Primitivas Booleanas
       (expresion (primitiva-booleana "(" (separated-list expresion ",") ")") primitiva-booleana-expresion)
@@ -66,7 +69,7 @@
       (operaciones-booleanas ("or") or-booleana)
 
       ;; Expresion booleanas
-      (expresion (boolenas-expresion "(" (separated-list expresion ",") ")") boolenas-expresion-expresion)
+      (expresion (boolenas-expresion) boolenas-expresion-expresion)
       (boolenas-expresion ("true") true-booleana)
       (boolenas-expresion ("false") false-booleana)
       ;;(boolenas-expresion primitiva-booleana "(" (separated-list expresion ",") ")" list-primitivas-booleana)
@@ -211,14 +214,15 @@
          (suma-primitiva () (operacion-primitiva lval + 0))
          (resta-primitiva () (operacion-primitiva lval - 0))
          (multiplicacion-primitiva () (operacion-primitiva lval * 1))
-         (modulo-primitiva () (remainder (car lval) (cadr lval))) 
-         ;; primitivas is, &
+         (modulo-primitiva () (remainder (car lval) (cadr lval)))
+         (concatenacion-primitiva () (string-append (car lval) (cadr lval)))
+         (igual-expresion () (equal? (car lval) (cadr lval)))
       
       )
    )
 )
 
-(define evaluar-primitiva-boooleana
+(define evaluar-primitiva-booleana
    (lambda (prim lval)
       (cases primitiva-booleana prim
          (menor-expresion () (< (car lval) (cadr lval)))
@@ -235,10 +239,10 @@
          (literal-expresion (dato) dato)
          (variable-expresion (variable) (aplicar-ambiente ambi variable))
          (caracter-expresion (caracter) caracter)
-         (cadena-expresion (cadena) cadena)
+         (cadena-expresion (cadena) (substring cadena 1 (- (string-length cadena) 1)))
          (ok-expresion () 'ok)
-         (boolenas-expresion-expresion (exp1 exp2)
-            (cases boolenas-expresion exp
+         (boolenas-expresion-expresion (exp1)
+            (cases boolenas-expresion exp1
                (true-booleana () #t)
                (false-booleana () #f)
             )
@@ -253,7 +257,7 @@
          (primitiva-booleana-expresion (primitiva-booleana lista-valores)
             (let
                ((lval (map (lambda (exp) (evaluar-expresion exp ambi)) lista-valores)))
-               (evaluar-primitiva-boooleana primitiva-booleana lval)
+               (evaluar-primitiva-booleana primitiva-booleana lval)
             )
          )
          (operaciones-booleanas-expresion (lista-operaciones-booleanas lista-valores)
@@ -261,8 +265,8 @@
                ((lval (map (lambda (exp) (evaluar-expresion exp ambi)) lista-valores)))
                (cases operaciones-booleanas lista-operaciones-booleanas
                   (not-booleana () (not (car lval)))
-                  (and-booleana () (map (lambda (x) x) lval)) ;; TODO revisar
-                  (or-booleana () (map (lambda (x) x) lval)) ;; TODO revisar
+                  (and-booleana () (and (car lval) (cadr lval))) 
+                  (or-booleana () (or (car lval) (cadr lval)))
                )
             )
          )
