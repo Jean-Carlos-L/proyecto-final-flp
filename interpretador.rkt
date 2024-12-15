@@ -26,8 +26,8 @@
       (expresion ("ok") ok-expresion)
 
       ;; Ligaduras
-      (expresion ("var" (arbno identificador "=" expresion) "in" expresion "end") var-expresion)
-      (expresion ("let" (arbno identificador "=" expresion) "in" expresion "end") let-expresion)
+      (expresion ("var" (separated-list identificador "=" expresion ",") "in" expresion "end") var-expresion)
+      (expresion ("let" (separated-list identificador "=" expresion ",") "in" expresion "end") let-expresion)
       (expresion ("letrec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion) "in" expresion) letrec-expresion)
       (expresion ("set" identificador ":=" expresion) set-expresion)
       (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
