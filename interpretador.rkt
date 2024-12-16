@@ -29,6 +29,7 @@
                expresion)
      letrec-expresion)
     (expresion ("set" identificador ":=" expresion) set-expresion)
+    ; (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
     (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
     ;; Condicionales
     (expresion ("if" expresion
@@ -41,9 +42,8 @@
                if-expresion)
     ;;(expresion ("proc" "(" (separated-list identificador ",") ")" expresion "end") proc-expresion)
     ;;(expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
-    ;;(expresion ("meth" "(" identificador "," (separated-list identificador ",") ")" expresion "end") meth-expresion)
-    ;;(expresion ("for" identificador "=" expresion "to" expresion "do" expresion "end") for-expresion)
-    ;;(expresion ("send" identificador "." identificador "(" (separated-list identificador ",") ")") send-expresion)
+    ;; For
+    (expresion ("for" identificador "=" expresion "to" expresion "do" expresion "end") for-expresion)
     ;;(expresion ("clone" "(" identificador (separated-list identificador ",") ")") clone-expresion)
     ;; Primitivas Aritmeticas
     (expresion (primitiva "(" (separated-list expresion ",") ")") primitiva-expresion)
@@ -76,7 +76,12 @@
     ;;Objetos
     (expresion ("object" "{" (arbno identificador "=>" expresion) "}") obj-exp)
     (expresion ("get" identificador "." identificador) get-exp)
-    (expresion ("update" identificador "." identificador ":=" expresion) update-exp)))
+    (expresion ("update" identificador "." identificador ":=" expresion) update-exp)
+    (expresion ("meth" "(" identificador (arbno "," identificador) ")" expresion "end")
+               meth-expresion)
+    (expresion ("send" identificador "." identificador "(" (separated-list expresion ",") ")")
+               send-expresion)
+    (expresion ("clone" "(" identificador ")") clone-expresion)))
 
 ;; Creamos los datatypes automaticamente
 (sllgen:make-define-datatypes especificacion-lexica especificacion-gramatical)
@@ -154,7 +159,7 @@
            (suma-primitiva () (operacion-primitiva lval + 0))
            (resta-primitiva () (operacion-primitiva lval - 0))
            (multiplicacion-primitiva () (operacion-primitiva lval * 1))
-           (modulo-primitiva () (remainder (car lval) (cadr lval)))
+           (modulo-primitiva () (modulo (car lval) (cadr lval)))
            (concatenacion-primitiva () (string-append (car lval) (cadr lval)))
            (igual-expresion () (equal? (car lval) (cadr lval))))))
 
@@ -171,21 +176,21 @@
 
 (define-datatype objeto objeto? (un-objeto (fields (list-of symbol?)) (exps vector?)))
 
+(define-datatype metodo metodo? (un-metodo (ids (list-of symbol?)) (body expresion?)))
+
 (define valor-atributo
   (lambda (sym obj env)
     (cases objeto
            obj
-           (un-objeto
-            (fields exps)
-            ;; buscamos la posicion del simbolo en la lista fields del objeto
-            (let ([pos (rib-find-position sym fields)])
-              ;; si la posicion corresponde a un number
-              (if (number? pos)
-                  (let ([value (vector-ref exps pos)])
-                    ;; extraemos el valor correspondiente al simbolo y se retorna su evaluacion
-                    (evaluar-expresion value env))
-                  ;; en caso contrario se lanza un error
-                  (eopl:error 'objeto "Field ~s has not been defined" sym)))))))
+           (un-objeto (fields exps)
+                      (let ([pos (rib-find-position sym fields)])
+
+                        (if (number? pos)
+                            (let ([value (vector-ref exps pos)])
+
+                              (evaluar-expresion value env))
+
+                            (eopl:error 'objeto "Field ~s has not been defined" sym)))))))
 
 (define rib-find-position (lambda (sym los) (list-find-position sym los)))
 
@@ -205,13 +210,12 @@
     (cases objeto
            obj
            (un-objeto (fields exps)
-                      ;; buscamos la posicion del simbolo en el objeto
                       (let ([pos (rib-find-position id fields)])
-                        ;; si la posicion es un number
+
                         (if (number? pos)
-                            ;; cambiamos el valor en la posicion del vector del objeto
+
                             (vector-set! exps pos new-value)
-                            ;; si no es, se lanza un error
+
                             (eopl:error 'update "El campo ~s no ha sido definido" id)))))))
 
 (define evaluar-expresion
@@ -223,6 +227,14 @@
      (variable-expresion (variable) (aplicar-ambiente ambi variable))
      (caracter-expresion (caracter) caracter)
      (cadena-expresion (cadena) (substring cadena 1 (- (string-length cadena) 1)))
+     (for-expresion
+      (var start end body)
+      (let loop ([i (evaluar-expresion start ambi)]
+                 [resultados '()])
+        (if (<= i (evaluar-expresion end ambi))
+            (let ([resultado (evaluar-expresion body (ambiente-extendido (list var) (list i) ambi))])
+              (loop (+ i 1) (cons resultado resultados)))
+            (reverse resultados))))
      (ok-expresion () 'ok)
      (boolenas-expresion-expresion
       (exp1)
@@ -286,22 +298,65 @@
                              (evaluar-expresion (car lista-expresiones) ambi)
                              (evaluar-elseif (cdr lista-condiciones) (cdr lista-expresiones)))]))])
             (evaluar-elseif lista-condiciones lista-expresiones))))
-     (obj-exp (ids exps)
-              ;; se crea un estructura de tipo object
-              (un-objeto ids (list->vector exps)))
+     (obj-exp (ids exps) (un-objeto ids (list->vector exps)))
      (get-exp (obj-id sym)
-              ;; se liga el resultado de aplicar el ambiente a obj-id
               (let ([obj (aplicar-ambiente ambi obj-id)])
-                ;; se hace el llamado a valor-atributo
+
                 (valor-atributo sym obj ambi)))
-     (update-exp
-      (obj-id field-id new-val)
-      (let ([obj (aplicar-ambiente ambi obj-id)])
-        ;; se hace el llamado a actualizar-atributo con el objeto, el id del campo y el nuevo valor
-        (actualizar-atributo obj field-id new-val))))))
+     (update-exp (obj-id field-id new-val)
+                 (let ([obj (aplicar-ambiente ambi obj-id)])
+
+                   (actualizar-atributo obj field-id new-val)))
+     (meth-expresion (id args-ids body-exp) (un-metodo args-ids body-exp))
+     (send-expresion (obj-id meth-id args)
+                     (let ([args (evaluar-rands args ambi)]
+
+                           [obj (aplicar-ambiente ambi obj-id)])
+
+                       (aplicar-metodo obj meth-id args ambi)))
+     (clone-expresion (id)
+                      (let ([obj (aplicar-ambiente ambi id)])
+
+                        (if (objeto? obj)
+                            obj
+
+                            (eopl:error 'clone "Esto no es un objeto -> ~s" id)))))))
 
 (define ambiente-inicial
   (ambiente-extendido '($var1 $var2 $var3) '(2 "Hola mundo" 'a) (ambiente-vacio)))
+
+(define evaluar-rands
+  (lambda (exps env)
+    (map (lambda (exp)
+
+           (if (objeto? exp)
+               exp
+
+               (evaluar-expresion exp env)))
+         exps)))
+
+(define aplicar-metodo
+  (lambda (obj meth args env)
+    (cases objeto
+           obj
+           (un-objeto
+            (fields exps)
+            (let ([pos (rib-find-position meth fields)])
+
+              (if (number? pos)
+
+                  (let ([met (evaluar-expresion (vector-ref exps pos) env)])
+                    (if (metodo? met)
+                        (cases metodo
+                               met
+                               (un-metodo (ids body)
+                                          (if (equal? (length args) (length ids))
+
+                                              (evaluar-expresion body
+                                                                 (ambiente-extendido ids args env))
+                                              (eopl:error 'send "Número de argumentos incorrecto"))))
+                        (eopl:error 'send "No es un método -> ~s" meth)))
+                  (eopl:error 'send "No se ha definido el método ~s" meth)))))))
 
 (define evaluar-programa
   (lambda (program)
