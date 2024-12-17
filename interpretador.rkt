@@ -40,8 +40,8 @@
                      expresion
                      "end")
                if-expresion)
-    ;;(expresion ("proc" "(" (separated-list identificador ",") ")" expresion "end") proc-expresion)
-    ;;(expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
+    (expresion ("proc" "(" (separated-list identificador ",") ")" expresion "end") proc-expresion)
+    (expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
     ;; For
     (expresion ("for" identificador "=" expresion "to" expresion "do" expresion "end") for-expresion)
     ;;(expresion ("clone" "(" identificador (separated-list identificador ",") ")") clone-expresion)
@@ -86,9 +86,19 @@
 ;; Creamos los datatypes automaticamente
 (sllgen:make-define-datatypes especificacion-lexica especificacion-gramatical)
 
+;; Procedimientos
+
 (define-datatype procedimiento
                  procedimiento?
                  (closure (variable (list-of symbol?)) (cuerpo expresion?) (ambiente ambiente?)))
+(define aplicar-procedimiento
+	(lambda (procd args)
+		(cases procedimiento procd
+			(closure (variable cuerpo ambiente)
+				;; se evalua el cuerpo de el procedimiento en un ambiente extendido con los valores de los argumentos
+				(evaluar-expresion cuerpo (ambiente-extendido variable args ambiente))))))               
+;; Fin de Procedimientos 
+
 
 ;; Definimos los ambientes
 (define-datatype ambiente
@@ -263,6 +273,18 @@
                     (let ([valores (map (lambda (exp) (evaluar-expresion exp ambi))
                                         lista-expresiones)])
                       (evaluar-expresion exp (ambiente-extendido lista-ids valores ambi))))
+     ;; Procedimientos expresiones
+     (proc-expresion (variable cuerpo) (closure variable cuerpo ambi))
+     ;; Apply
+     (apply-expresion(identificador args)
+     ;;se aplica el ambiente para conocer el valor del id y se liga a proced
+				(let ((procedimiento (aplicar-ambiente ambi identificador))
+					;;se evaluan los argumentos y se ligan a args
+					(args (evaluar-rands args ambi)))
+					;;si proced es un procedimiento, se usa la funcion para aplicar un proc con proced y args
+					(if (procedimiento? procedimiento) (aplicar-procedimiento procedimiento args)
+						;;en el caso contrario se muestra un error
+						(eopl:error 'evaluar-expresion "ERROR: NO es un procedimiento -> ~s" identificador))))
      (letrec-expresion
       (lista-ids lista-params cuerpos exp)
       (evaluar-expresion exp (ambiente-extendido-recursivo lista-ids lista-params cuerpos ambi)))
