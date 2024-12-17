@@ -32,7 +32,7 @@
     ; (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
     (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
     ;; Condicionales
-    (expresion ("if" expresion
+    (expresion ("if" boolenas-expresion
                      "then"
                      expresion
                      (arbno "elseif" expresion "then" expresion)
@@ -52,27 +52,27 @@
     (primitiva ("*") multiplicacion-primitiva)
     (primitiva ("%") modulo-primitiva)
     (primitiva ("&") concatenacion-primitiva)
-    (primitiva ("is") igual-expresion)
     ;; Primitivas Booleanas
-    (expresion (primitiva-booleana "(" (separated-list expresion ",") ")")
-               primitiva-booleana-expresion)
-    ;;(primitiva-booleana ("is" expresion expresion) igual-expresion)
+    (expresion (boolenas-expresion) boolenas-expresion-expresion)
+    (boolenas-expresion ("true") true-booleana)
+    (boolenas-expresion ("false") false-booleana)
+    (boolenas-expresion (primitiva-booleana "(" (separated-list expresion ",") ")") list-primitivas-booleanas)
+
+    (boolenas-expresion (primitiva-booleana) primitiva-booleana-expresion)
     (primitiva-booleana ("<") menor-expresion)
     (primitiva-booleana (">") mayor-expresion)
     (primitiva-booleana ("<=") menor-igual-expresion)
     (primitiva-booleana (">=") mayor-igual-expresion)
+    (primitiva-booleana ("is") igual-expresion)
+
+    ;;(boolenas-expresion operaciones-booleanas "(" (separated-list boolenas-expresion ",") ")" list-operaciones-booleana)
     ;; Operaciones booleanas
-    (expresion (operaciones-booleanas "(" (separated-list expresion ",") ")")
-               operaciones-booleanas-expresion)
+    (expresion (operaciones-booleanas "(" (separated-list expresion ",") ")") operaciones-booleanas-expresion)
     (operaciones-booleanas ("not") not-booleana)
     (operaciones-booleanas ("and") and-booleana)
     (operaciones-booleanas ("or") or-booleana)
     ;; Expresion booleanas
-    (expresion (boolenas-expresion) boolenas-expresion-expresion)
-    (boolenas-expresion ("true") true-booleana)
-    (boolenas-expresion ("false") false-booleana)
-    ;;(boolenas-expresion primitiva-booleana "(" (separated-list expresion ",") ")" list-primitivas-booleana)
-    ;;(boolenas-expresion operaciones-booleanas "(" (separated-list boolenas-expresion ",") ")" list-operaciones-booleana)
+    
     ;;Objetos
     (expresion ("object" "{" (arbno identificador "=>" expresion) "}") obj-exp)
     (expresion ("get" identificador "." identificador) get-exp)
@@ -171,16 +171,19 @@
            (multiplicacion-primitiva () (operacion-primitiva lval * 1))
            (modulo-primitiva () (modulo (car lval) (cadr lval)))
            (concatenacion-primitiva () (string-append (car lval) (cadr lval)))
-           (igual-expresion () (equal? (car lval) (cadr lval))))))
+          )))
 
 (define evaluar-primitiva-booleana
   (lambda (prim lval)
-    (cases primitiva-booleana
-           prim
-           (menor-expresion () (< (car lval) (cadr lval)))
-           (menor-igual-expresion () (<= (car lval) (cadr lval)))
-           (mayor-expresion () (> (car lval) (cadr lval)))
-           (mayor-igual-expresion () (>= (car lval) (cadr lval))))))
+    (cases primitiva-booleana prim
+      (menor-expresion () (<(car lval) (cadr lval)))
+      (menor-igual-expresion () (<= (car lval) (cadr lval)))
+      (mayor-expresion () (>(car lval) (cadr lval)))
+      (mayor-igual-expresion () (>=(car lval) (cadr lval)))
+      (igual-expresion () (=(car lval) (cadr lval)))
+    )
+  )
+)
 
 ;; Objetos
 
@@ -228,8 +231,26 @@
 
                             (eopl:error 'update "El campo ~s no ha sido definido" id)))))))
 
+(define validar-set
+  (lambda (exp)
+    (cases expresion exp
+      (set-expresion (variable exp) #t)
+      (else #f)
+    )
+  )
+)
+
+(define validar-let
+  (lambda (exp)
+    (cases expresion exp
+      (let-expresion (lista-ids lista-expresiones exp) #t)
+      (else #f)
+    )
+  )
+)
+
 (define evaluar-expresion
-  (lambda (exp ambi)
+  (lambda (exp ambi old-expresion)
     (cases
      expresion
      exp
@@ -239,26 +260,27 @@
      (cadena-expresion (cadena) (substring cadena 1 (- (string-length cadena) 1)))
      (for-expresion
       (var start end body)
-      (let loop ([i (evaluar-expresion start ambi)]
+      (let loop ([i (evaluar-expresion start ambi old-expresion)]
                  [resultados '()])
-        (if (<= i (evaluar-expresion end ambi))
-            (let ([resultado (evaluar-expresion body (ambiente-extendido (list var) (list i) ambi))])
+        (if (<= i (evaluar-expresion end ambi old-expresion))
+            (let ([resultado (evaluar-expresion body (ambiente-extendido (list var) (list i) ambi) old-expresion)])
               (loop (+ i 1) (cons resultado resultados)))
             (reverse resultados))))
      (ok-expresion () 'ok)
-     (boolenas-expresion-expresion
-      (exp1)
-      (cases boolenas-expresion exp1 (true-booleana () #t) (false-booleana () #f)))
+    (boolenas-expresion-expresion (exp1)
+      exp1
+      ;;; (cases boolenas-expresion exp1 
+      ;;;   (true-booleana () #t) 
+      ;;;   (false-booleana () #f)
+      ;;;   (list-primitivas-booleanas (lista-valores expresion) lista-valores) 
+      ;;; )
+    )
      (primitiva-expresion (primitiva lista-valores)
-                          (let ([lval (map (lambda (exp) (evaluar-expresion exp ambi))
+                          (let ([lval (map (lambda (exp) (evaluar-expresion exp ambi old-expresion))
                                            lista-valores)])
                             (evaluar-primitiva primitiva lval)))
-     (primitiva-booleana-expresion (primitiva-booleana lista-valores)
-                                   (let ([lval (map (lambda (exp) (evaluar-expresion exp ambi))
-                                                    lista-valores)])
-                                     (evaluar-primitiva-booleana primitiva-booleana lval)))
      (operaciones-booleanas-expresion (lista-operaciones-booleanas lista-valores)
-                                      (let ([lval (map (lambda (exp) (evaluar-expresion exp ambi))
+                                      (let ([lval (map (lambda (exp) (evaluar-expresion exp ambi old-expresion))
                                                        lista-valores)])
                                         (cases operaciones-booleanas
                                                lista-operaciones-booleanas
@@ -266,13 +288,19 @@
                                                (and-booleana () (and (car lval) (cadr lval)))
                                                (or-booleana () (or (car lval) (cadr lval))))))
      (var-expresion (lista-ids lista-expresiones exp)
-                    (let ([valores (map (lambda (exp) (evaluar-expresion exp ambi))
+                    (let ([valores (map (lambda (exp) (evaluar-expresion exp ambi old-expresion))
                                         lista-expresiones)])
-                      (evaluar-expresion exp (ambiente-extendido lista-ids valores ambi))))
-     (let-expresion (lista-ids lista-expresiones exp)
-                    (let ([valores (map (lambda (exp) (evaluar-expresion exp ambi))
-                                        lista-expresiones)])
-                      (evaluar-expresion exp (ambiente-extendido lista-ids valores ambi))))
+                      (evaluar-expresion exp (ambiente-extendido lista-ids valores ambi) old-expresion)))
+
+     (let-expresion (lista-ids lista-expresiones sub-exp)
+          (if (validar-set sub-exp)
+              (eopl:error 'evaluar-expresion "ERROR: No se puede hacer un set en un let")
+              (let 
+                ([valores (map (lambda (exp) (evaluar-expresion sub-exp ambi old-expresion)) lista-expresiones)])
+                (evaluar-expresion sub-exp (ambiente-extendido lista-ids valores ambi) old-expresion)
+              )
+          )
+      )
      ;; Procedimientos expresiones
      (proc-expresion (variable cuerpo) (closure variable cuerpo ambi))
      ;; Apply
@@ -287,39 +315,50 @@
 						(eopl:error 'evaluar-expresion "ERROR: NO es un procedimiento -> ~s" identificador))))
      (letrec-expresion
       (lista-ids lista-params cuerpos exp)
-      (evaluar-expresion exp (ambiente-extendido-recursivo lista-ids lista-params cuerpos ambi)))
+      (evaluar-expresion exp (ambiente-extendido-recursivo lista-ids lista-params cuerpos ambi) old-expresion))
      (begin-expresion
       (exp lista-expresiones)
       (if (null? lista-expresiones)
-          (evaluar-expresion exp ambi)
+          (evaluar-expresion exp ambi old-expresion)
           (begin
-            (evaluar-expresion exp ambi)
+            (evaluar-expresion exp ambi old-expresion)
             (letrec ([evaluar-begin (lambda (lista-expresiones)
                                       (cond
                                         [(null? (cdr lista-expresiones))
-                                         (evaluar-expresion (car lista-expresiones) ambi)]
+                                         (evaluar-expresion (car lista-expresiones) ambi old-expresion)]
                                         [else
                                          (begin
-                                           (evaluar-expresion (car lista-expresiones) ambi)
+                                           (evaluar-expresion (car lista-expresiones) ambi old-expresion)
                                            (evaluar-begin (cdr lista-expresiones)))]))])
               (evaluar-begin lista-expresiones)))))
      (set-expresion (variable exp)
-                    (begin
-                      (setref! (aplicar-ambiente-referencia ambi variable)
-                               (evaluar-expresion exp ambi))))
-     (if-expresion
-      (condicion exp lista-condiciones lista-expresiones expresion-else)
-      (if (evaluar-expresion condicion ambi)
-          (evaluar-expresion exp ambi)
-          (letrec ([evaluar-elseif
-                    (lambda (lista-condiciones lista-expresiones)
-                      (cond
-                        [(null? lista-condiciones) (evaluar-expresion expresion-else ambi)]
-                        [else
-                         (if (evaluar-expresion (car lista-condiciones) ambi)
-                             (evaluar-expresion (car lista-expresiones) ambi)
-                             (evaluar-elseif (cdr lista-condiciones) (cdr lista-expresiones)))]))])
-            (evaluar-elseif lista-condiciones lista-expresiones))))
+      (begin
+        (if (validar-let old-expresion)
+          (eopl:error 'evaluar-expresion "ERROR: No se puede hacer un set en un let")
+          (setref! 
+            (aplicar-ambiente-referencia ambi variable)
+            (evaluar-expresion exp ambi old-expresion)
+          )
+        )
+      )
+    )
+
+    (if-expresion (condicion exp lista-condiciones lista-expresiones expresion-else)
+      condicion
+      ;;; (if (evaluar-expresion condicion ambi old-expresion)
+      ;;;     (evaluar-expresion exp ambi old-expresion)
+      ;;;     (letrec ([evaluar-elseif
+      ;;;               (lambda (lista-condiciones lista-expresiones)
+      ;;;                 (cond
+      ;;;                   [(null? lista-condiciones) (evaluar-expresion expresion-else ambi old-expresion)]
+      ;;;                   [else
+      ;;;                    (if (evaluar-expresion (car lista-condiciones) ambi old-expresion)
+      ;;;                        (evaluar-expresion (car lista-expresiones) ambi old-expresion)
+      ;;;                        (evaluar-elseif (cdr lista-condiciones) (cdr lista-expresiones)))]))])
+      ;;;       (evaluar-elseif lista-condiciones lista-expresiones)))
+    )
+
+
      (obj-exp (ids exps) (un-objeto ids (list->vector exps)))
      (get-exp (obj-id sym)
               (let ([obj (aplicar-ambiente ambi obj-id)])
@@ -345,7 +384,7 @@
                             (eopl:error 'clone "Esto no es un objeto -> ~s" id)))))))
 
 (define ambiente-inicial
-  (ambiente-extendido '($var1 $var2 $var3) '(2 "Hola mundo" 'a) (ambiente-vacio)))
+  (ambiente-extendido '(var1 var2 var3) '(2 "Hola mundo" 'a) (ambiente-vacio)))
 
 (define evaluar-rands
   (lambda (exps env)
@@ -354,7 +393,7 @@
            (if (objeto? exp)
                exp
 
-               (evaluar-expresion exp env)))
+               (evaluar-expresion exp env exp)))
          exps)))
 
 (define aplicar-metodo
@@ -367,7 +406,7 @@
 
               (if (number? pos)
 
-                  (let ([met (evaluar-expresion (vector-ref exps pos) env)])
+                  (let ([met (evaluar-expresion (vector-ref exps pos) env exps)])
                     (if (metodo? met)
                         (cases metodo
                                met
@@ -375,14 +414,14 @@
                                           (if (equal? (length args) (length ids))
 
                                               (evaluar-expresion body
-                                                                 (ambiente-extendido ids args env))
+                                                                 (ambiente-extendido ids args env) exp)
                                               (eopl:error 'send "Número de argumentos incorrecto"))))
                         (eopl:error 'send "No es un método -> ~s" meth)))
                   (eopl:error 'send "No se ha definido el método ~s" meth)))))))
 
 (define evaluar-programa
   (lambda (program)
-    (cases programa program (a-program (exp) (evaluar-expresion exp ambiente-inicial)))))
+    (cases programa program (a-program (exp) (evaluar-expresion exp ambiente-inicial exp)))))
 
 (define interpretador
   (sllgen:make-rep-loop "interpretador> "
