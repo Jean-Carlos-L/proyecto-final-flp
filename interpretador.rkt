@@ -186,14 +186,25 @@
 
 (define-datatype objeto objeto? (un-objeto (fields (list-of symbol?)) (exps vector?)))
 
-(define-datatype metodo metodo? (un-metodo (ids (list-of symbol?)) (body expresion?)))
+(define-datatype metodo metodo?
+  (un-metodo (args (list-of symbol?)) (body expresion?)))
+
+(define metodo-args
+  (lambda (mth)
+    (cases metodo mth
+      (un-metodo (args body) args))))
+
+(define metodo-body
+  (lambda (mth)
+    (cases metodo mth
+      (un-metodo (args body) body))))
 
 (define valor-atributo
   (lambda (sym obj env)
     (cases objeto
            obj
            (un-objeto (fields exps)
-                      (let ([pos (rib-find-position sym fields)])
+                      (let ([pos (find-position sym fields)])
 
                         (if (number? pos)
                             (let ([value (vector-ref exps pos)])
@@ -202,7 +213,7 @@
 
                             (eopl:error 'objeto "Field ~s has not been defined" sym)))))))
 
-(define rib-find-position (lambda (sym los) (list-find-position sym los)))
+(define find-position (lambda (sym los) (list-find-position sym los)))
 
 (define list-find-position (lambda (sym los) (list-index (lambda (sym1) (eqv? sym1 sym)) los)))
 
@@ -220,7 +231,7 @@
     (cases objeto
            obj
            (un-objeto (fields exps)
-                      (let ([pos (rib-find-position id fields)])
+                      (let ([pos (find-position id fields)])
 
                         (if (number? pos)
 
@@ -329,7 +340,8 @@
                  (let ([obj (aplicar-ambiente ambi obj-id)])
 
                    (actualizar-atributo obj field-id new-val)))
-     (meth-expresion (id args-ids body-exp) (un-metodo args-ids body-exp))
+     (meth-expresion (self-id args-ids body-exp)
+      (un-metodo (cons self-id args-ids) body-exp))
      (send-expresion (obj-id meth-id args)
                      (let ([args (evaluar-rands args ambi)]
 
@@ -357,28 +369,14 @@
                (evaluar-expresion exp env)))
          exps)))
 
-(define aplicar-metodo
-  (lambda (obj meth args env)
-    (cases objeto
-           obj
-           (un-objeto
-            (fields exps)
-            (let ([pos (rib-find-position meth fields)])
+(define (aplicar-metodo obj meth-id args ambi)
+  (let* ((metodo (valor-atributo meth-id obj ambi))
+         (self obj)
+         (nuevo-ambiente (ambiente-extendido (metodo-args metodo)
+                                     (cons self args)
+                                     ambi)))
+    (evaluar-expresion (metodo-body metodo) nuevo-ambiente)))
 
-              (if (number? pos)
-
-                  (let ([met (evaluar-expresion (vector-ref exps pos) env)])
-                    (if (metodo? met)
-                        (cases metodo
-                               met
-                               (un-metodo (ids body)
-                                          (if (equal? (length args) (length ids))
-
-                                              (evaluar-expresion body
-                                                                 (ambiente-extendido ids args env))
-                                              (eopl:error 'send "Número de argumentos incorrecto"))))
-                        (eopl:error 'send "No es un método -> ~s" meth)))
-                  (eopl:error 'send "No se ha definido el método ~s" meth)))))))
 
 (define evaluar-programa
   (lambda (program)
