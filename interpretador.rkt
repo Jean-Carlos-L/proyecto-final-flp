@@ -105,7 +105,6 @@ Returns: El resultado de evaluar el cuerpo del procedimiento en el ambiente exte
 	(lambda (procd args)
 		(cases procedimiento procd
 			(closure (variable cuerpo ambiente)
-				;; se evalua el cuerpo de el procedimiento en un ambiente extendido con los valores de los argumentos
 				(evaluar-expresion cuerpo (ambiente-extendido variable args ambiente) cuerpo)))))               
 ;; Fin de Procedimientos 
 
@@ -399,17 +398,11 @@ Returns: #t si la expresión es un set, #f en caso contrario.
         )
         ;;; (evaluar-expresion exp (ambiente-extendido-recursivo lista-ids lista-params cuerpos ambi) old-expresion)
       )
-     ;; Procedimientos expresiones
      (proc-expresion (variable cuerpo) (closure variable cuerpo ambi))
-     ;; Apply
      (apply-expresion(identificador args)
-     ;;se aplica el ambiente para conocer el valor del id y se liga a proced
 				(let ((procedimiento (aplicar-ambiente ambi identificador))
-					;;se evaluan los argumentos y se ligan a args
 					(args (evaluar-rands args ambi)))
-					;;si proced es un procedimiento, se usa la funcion para aplicar un proc con proced y args
 					(if (procedimiento? procedimiento) (aplicar-procedimiento procedimiento args)
-						;;en el caso contrario se muestra un error
 						(eopl:error 'evaluar-expresion "ERROR: NO es un procedimiento -> ~s" identificador))))
      
      (begin-expresion
@@ -529,7 +522,7 @@ Returns: #t si la expresión es un set, #f en caso contrario.
   )
 )
 
-; (interpretador)
+;;(interpretador)
 
 (define scan&parse
    (sllgen:make-string-parser especificacion-lexica especificacion-gramatical)

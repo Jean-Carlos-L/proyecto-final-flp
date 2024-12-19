@@ -72,6 +72,25 @@
        "let x = proc(y) *(y, y) end in letrec f(a,b) = +(b, apply x(a)) in apply f(2,3) end end"))
     (check-equal? (evaluar-programa exp3) 7 "Error en la prueba 3")))
 
+(define pruebas-proc
+   (lambda ()
+      (define exp1 (scan&parse "proc() 2 end"))
+      (check-equal? (evaluar-programa exp1)closure "proc simple, retorna closure") 
+
+      (define exp2 (scan&parse "proc(r) 9 end"))
+      (check-equal? (evaluar-programa exp2)closure "proc simple con 1 variable, retorna closure")
+      
+      (define exp3 (scan&parse "let x=5, y=proc(z) +(x,z) end in y end"))
+      (check-equal? (evaluar-programa exp3)closure "prueba de proc con let")
+
+      (define exp4 (scan&parse "let x=8 in let y=proc(z) +(x,z) end in let w=y in apply w(2) end end end"))
+      (check-equal? (evaluar-programa exp4)10 "Prueba procedimientos con let y apply")
+
+      (define exp5 (scan&parse "proc(a,b,c,r) *(2,3) end"))
+      (check-equal? (evaluar-programa exp5)closure "multiplicacion procedimiento")     
+   )
+)
+
 (define pruebas-begin
   (lambda ()
     (define exp1 (scan&parse "begin 1; 2; 3 end"))
@@ -132,18 +151,13 @@
       (check-equal? (evaluar-programa exp3) 8 "Prueba objetos con clone y send")
     ))
 
-
-
-    
-
-    
-
 (define run-pruebas
   (lambda ()
     (pruebas-if)
     (pruebas-let)
     (pruebas-var)
     (pruebas-letrec)
+    (pruebas-proc)
     (pruebas-begin)
     (pruebas-for)
     (pruebas-object)))
