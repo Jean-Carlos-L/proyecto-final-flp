@@ -27,7 +27,7 @@
                let-expresion)
     (expresion ("letrec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion) "in" expresion "end") letrec-expresion)
     (expresion ("set" identificador ":=" expresion) set-expresion)
-    ; (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
+
     (expresion ("begin" expresion (arbno ";" expresion) "end") begin-expresion)
     ;; Condicionales
     (expresion ("if" expresion "then" expresion (arbno "elseif" expresion "then" expresion) "else" expresion "end") if-expresion)
@@ -35,7 +35,7 @@
     (expresion ("apply" identificador "(" (separated-list expresion ",") ")") apply-expresion)
     ;; For
     (expresion ("for" identificador "=" expresion "to" expresion "do" expresion "end") for-expresion)
-    ;;(expresion ("clone" "(" identificador (separated-list identificador ",") ")") clone-expresion)
+
     ;; Primitivas Aritmeticas
     (expresion (primitiva "(" (separated-list expresion ",") ")") primitiva-expresion)
     (primitiva ("+") suma-primitiva)
@@ -47,7 +47,6 @@
     (expresion (boolenas-expresion) boolenas-expresion-expresion)
     (boolenas-expresion ("true") true-booleana)
     (boolenas-expresion ("false") false-booleana)
-    ;;(boolenas-expresion (primitiva-booleana "(" (separated-list expresion ",") ")") list-primitivas-booleanas)
 
     (expresion (primitiva-booleana "(" (separated-list expresion ",") ")") primitiva-booleana-expresion)
     (primitiva-booleana ("<") menor-expresion)
@@ -56,7 +55,6 @@
     (primitiva-booleana (">=") mayor-igual-expresion)
     (primitiva-booleana ("is") igual-expresion)
 
-    ;;(boolenas-expresion operaciones-booleanas "(" (separated-list boolenas-expresion ",") ")" list-operaciones-booleana)
     ;; Operaciones booleanas
     (expresion (operaciones-booleanas "(" (separated-list expresion ",") ")") operaciones-booleanas-expresion)
     (operaciones-booleanas ("not") not-booleana)
@@ -207,7 +205,7 @@
       (un-metodo (args body) body))))
 
 (define valor-atributo
-  (lambda (sym obj env)
+  (lambda (sym obj env old-expresion)
     (cases objeto
            obj
            (un-objeto (fields exps)
@@ -216,7 +214,7 @@
                         (if (number? pos)
                             (let ([value (vector-ref exps pos)])
 
-                              (evaluar-expresion value env))
+                              (evaluar-expresion value env old-expresion))
 
                             (eopl:error 'objeto "Field ~s has not been defined" sym)))))))
 
@@ -398,7 +396,7 @@
      (get-exp (obj-id sym)
               (let ([obj (aplicar-ambiente ambi obj-id)])
 
-                (valor-atributo sym obj ambi)))
+                (valor-atributo sym obj ambi old-expresion)))
      (update-exp (obj-id field-id new-val)
                  (let ([obj (aplicar-ambiente ambi obj-id)])
 
@@ -410,7 +408,7 @@
 
                            [obj (aplicar-ambiente ambi obj-id)])
 
-                       (aplicar-metodo obj meth-id args ambi)))
+                       (aplicar-metodo obj meth-id args ambi old-expresion)))
      (clone-expresion (id)
                       (let ([obj (aplicar-ambiente ambi id)])
 
@@ -438,13 +436,13 @@
   )
 )
 
-(define (aplicar-metodo obj meth-id args ambi)
-  (let* ((metodo (valor-atributo meth-id obj ambi))
+(define (aplicar-metodo obj meth-id args ambi old-expresion)
+  (let* ((metodo (valor-atributo meth-id obj ambi old-expresion))
          (self obj)
          (nuevo-ambiente (ambiente-extendido (metodo-args metodo)
                                      (cons self args)
                                      ambi)))
-    (evaluar-expresion (metodo-body metodo) nuevo-ambiente)))
+    (evaluar-expresion (metodo-body metodo) nuevo-ambiente old-expresion)))
 
 
 (define evaluar-programa
@@ -462,7 +460,7 @@
   )
 )
 
-;;; (interpretador)
+; (interpretador)
 
 (define scan&parse
    (sllgen:make-string-parser especificacion-lexica especificacion-gramatical)
