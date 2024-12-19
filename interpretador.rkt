@@ -1,5 +1,13 @@
+; Proyecto 1 - Lenguajes de Programación
+; Autores:
+; Diana Marcela Oviedo 2459375
+; Juan Camilo García Saenz 2259416
+; Jean Carlos Lerma Rojas 2259305
+; Juan Pablo Ospina Vanegas 2411023
+
 #lang eopl
 
+;;define las reglas léxicas para identificar diferentes tipos de tokens en el lenguaje
 (define especificacion-lexica
   '((espacio-blanco (whitespace) skip)
     (comentario ("(" "*" (arbno (not #\newline)) "*" ")") skip)
@@ -13,6 +21,7 @@
   )
 )
 
+;; define las reglas gramaticales del lenguaje, especificando cómo se pueden combinar los tokens para formar expresiones válidas.
 (define especificacion-gramatical
   '((programa (expresion) a-program)
     (expresion (numero) literal-expresion)
@@ -84,7 +93,14 @@
     (ambiente ambiente?)
   )
 )
-
+#|
+Function: aplicar-procedimiento
+Description: Esta función aplica un procedimiento a una lista de argumentos en un ambiente extendido.
+Parameters:
+  - procd: El procedimiento a aplicar.
+  - args: La lista de argumentos a pasar al procedimiento.
+Returns: El resultado de evaluar el cuerpo del procedimiento en el ambiente extendido con los valores de los argumentos.
+|#
 (define aplicar-procedimiento
 	(lambda (procd args)
 		(cases procedimiento procd
@@ -188,22 +204,47 @@
 )
 
 ;; Objetos
+#| 
+Datatype: objeto
+Description: Este datatype representa un objeto con sus propiedades y métodos específicos. 
 
+Datatype: metodo
+Description: Este datatype representa un método que puede ser invocado en el objeto, especificando su comportamiento y funcionalidad.
+|#
 (define-datatype objeto objeto? (un-objeto (fields (list-of symbol?)) (exps vector?)))
 
 (define-datatype metodo metodo?
   (un-metodo (args (list-of symbol?)) (body expresion?)))
 
+; Esta función toma un método `mth` y devuelve sus argumentos.
+;; Utiliza la construcción `cases` para coincidir con la estructura del método y extraer los argumentos.
+;; Parámetros:
+;; - `mth`: El método del cual extraer los argumentos.
+;;
+;; Retorna:
+;; - Los argumentos del método.
 (define metodo-args
   (lambda (mth)
     (cases metodo mth
       (un-metodo (args body) args))))
 
+; Esta función toma un método `mth` y devuelve su cuerpo.
+;; Parámetros:
+;; - `mth`: El método del cual extraer el cuerpo.
+;;
+;; Retorna:
+;; - El cuerpo del método.
 (define metodo-body
   (lambda (mth)
     (cases metodo mth
       (un-metodo (args body) body))))
 
+
+;; Esta función recupera el valor de un atributo de un objeto.
+;; Utiliza la construcción `cases` para coincidir con la estructura del objeto y encontrar la posición del atributo.
+;; Si se encuentra el atributo, evalúa su expresión en el entorno dado.
+;; Si no se encuentra el atributo, lanza un error.
+;; 
 (define valor-atributo
   (lambda (sym obj env old-expresion)
     (cases objeto
@@ -218,8 +259,12 @@
 
                             (eopl:error 'objeto "Field ~s has not been defined" sym)))))))
 
+;; Esta función encuentra la posición de un símbolo en una lista de símbolos.
+;; Delegar la búsqueda real a `list-find-position`.
 (define find-position (lambda (sym los) (list-find-position sym los)))
 
+;; `list-find-position`
+;; Esta función encuentra la posición de un símbolo en una lista de símbolos.
 (define list-find-position (lambda (sym los) (list-index (lambda (sym1) (eqv? sym1 sym)) los)))
 
 (define list-index
@@ -231,6 +276,8 @@
        (let ([list-index-r (list-index pred (cdr ls))])
          (if (number? list-index-r) (+ list-index-r 1) #f))])))
 
+;; Esta función actualiza el valor de un atributo en un objeto.
+;; Utiliza la construcción `cases` para coincidir con la estructura del objeto y encontrar la posición del atributo.
 (define actualizar-atributo
   (lambda (obj id new-value)
     (cases objeto
