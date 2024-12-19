@@ -117,11 +117,11 @@ Returns: El resultado de evaluar el cuerpo del procedimiento en el ambiente exte
                  (ambiente-extendido-referencia (lista-ids (list-of symbol?))
                                                 (lista-valores vector?)
                                                 (old-env ambiente?)))
-
+;;Ambiente extendido con referencias a procedimientos
 (define ambiente-extendido
   (lambda (lista-ids lista-valores old-env)
     (ambiente-extendido-referencia lista-ids (list->vector lista-valores) old-env)))
-
+;;Ambiente extendido recursivo 
 (define ambiente-extendido-recursivo
   (lambda (nombres-procedimientos lista-ids cuerpos old-env)
     (let 
@@ -154,7 +154,6 @@ Returns: El resultado de evaluar el cuerpo del procedimiento en el ambiente exte
 
 (define primitva-setref!
   (lambda (ref valor) (cases referencia ref (a-ref (i v) (vector-set! v i valor)))))
-
 (define setref! (lambda (ref valor) (primitva-setref! ref valor)))
 
 (define aplicar-ambiente (lambda (ambi variable) (deref (aplicar-ambiente-referencia ambi variable))))
@@ -179,7 +178,15 @@ Returns: El resultado de evaluar el cuerpo del procedimiento en el ambiente exte
     (cond
       [(null? lval) identidad]
       [else (operacion (car lval) (operacion-primitiva (cdr lval) operacion identidad))])))
-
+;;primitiva
+#|
+Function: evaluar-primitiva
+Description: Esta función evalúa una primitiva con una lista de valores.
+Parameters:
+  - prim: La primitiva a evaluar.
+  - lval: la lista de valores a evaluar.
+Returns: El resultado de evaluar la primitiva con los valores.
+|#
 (define evaluar-primitiva
   (lambda (prim lval)
     (cases primitiva
@@ -190,7 +197,15 @@ Returns: El resultado de evaluar el cuerpo del procedimiento en el ambiente exte
            (modulo-primitiva () (modulo (car lval) (cadr lval)))
            (concatenacion-primitiva () (string-append (car lval) (cadr lval)))
           )))
-
+;;primitiva booleana
+#|
+Function: evaluar-primitiva-booleana
+Description: Esta función evalúa una primitiva booleana con una lista de valores.
+Parameters:
+  - prim: La primitiva booleana a evaluar.
+  - lval: La lista de valores a evaluar.
+Returns: El resultado de evaluar la primitiva booleana con los valores.
+|#
 (define evaluar-primitiva-booleana
   (lambda (prim lval)
     (cases primitiva-booleana prim
@@ -290,7 +305,14 @@ Description: Este datatype representa un método que puede ser invocado en el ob
                             (vector-set! exps pos new-value)
 
                             (eopl:error 'update "El campo ~s no ha sido definido" id)))))))
-
+;;Validar set
+#|
+Function: validar-set
+Description: Esta función valida si una expresión es un set.
+Parameters:
+  - exp: La expresión a validar.
+Returns: #t si la expresión es un set, #f en caso contrario.
+|#
 (define validar-set
   (lambda (exp)
     (cases expresion exp
